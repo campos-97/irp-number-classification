@@ -10,6 +10,11 @@ import datetime as dt
 import joblib
 import os
 
+#keras
+from keras.datasets.mnist import load_data
+from keras.models import Sequential, load_model
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+
 # Import datasets, classifiers and performance metrics
 from sklearn import datasets, svm, metrics
 #fetch original mnist dataset
@@ -52,6 +57,7 @@ class Paint(object):
         self.verbose = IntVar()
         self.guess = StringVar()
         self.testModel = IntVar()
+        self.usingKeras = IntVar()
 
         # Default values
         self.kernels = {'linear', 'poly', 'rbf', 'sigmoid', 'precomputed'};
@@ -68,6 +74,7 @@ class Paint(object):
         self.verbose.set(0)
         self.guess.set('0')
         self.testModel.set(1)
+        self.usingKeras.set(0)
 
         self.models = {'None'}
         self.model = None
@@ -175,12 +182,19 @@ class Paint(object):
         im=im.convert('L')
         im=np.array(list(im.getdata()))
         im=1-im/255.0
+
+        if (self.usingKeras.get()):
+            return np.reshape(list(im), (1, 28, 28, 1))
         return list(im.reshape(1, -1))
+
 
     def classify(self):
         if(self.model != None):
             image = self.get_content_image()
-            self.guess.set(self.model.predict(image))
+            prediction = self.model.predict(image)
+            if (self.usingKeras.get()):
+                prediction = np.argmax(prediction, axis=1)
+            self.guess.set(prediction)
             self.guess_lbl.grid(row=1, columnspan=5)
 
     def train(self):
@@ -200,7 +214,15 @@ class Paint(object):
 
     def selectModel(self, *args):
         if(self.modelName.get() != "None"):
-            self.model = joblib.load("./models/"+self.modelName.get())
+            if(self.modelName.get().split('.')[-1] == "sav"):
+                self.usingKeras.set(0)
+                self.model = joblib.load("./models/"+self.modelName.get())
+            elif(self.modelName.get().split('.')[-1] == "h5"):
+                self.usingKeras.set(1)
+                del self.model
+                self.model = load_model("./models/"+self.modelName.get())
+            else:
+                print("Not supported format")
 
     def train_thread(self):
         classifier = svm.SVC(C=float(self.C.get()), kernel=self.kernel.get(), degree=int(self.degree.get()),
