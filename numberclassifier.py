@@ -51,6 +51,7 @@ class Paint(object):
         self.C = StringVar()
         self.verbose = IntVar()
         self.guess = StringVar()
+        self.testModel = IntVar()
 
         # Default values
         self.kernels = {'linear', 'poly', 'rbf', 'sigmoid', 'precomputed'};
@@ -61,11 +62,12 @@ class Paint(object):
         self.chacheSize.set('200')
         self.maxIter.set('100')
         self.degree.set('3')
-        self.gamma.set('auto')
+        self.gamma.set('0.05')
         self.coef.set('0.0')
         self.C.set('5')
         self.verbose.set(0)
         self.guess.set('0')
+        self.testModel.set(1)
 
         self.models = {'None'}
         self.model = None
@@ -90,7 +92,7 @@ class Paint(object):
         self.c = Canvas(self.root, bg='white', width=600, height=600)
         self.c.grid(row=1, columnspan=5)
 
-        self.modelMenu = OptionMenu(self.root, self.modelName, *self.models)
+        self.modelMenu = OptionMenu(self.root, self.modelName, *(self.models))
         self.modelMenu.grid(row=0, column=1)
         self.modelMenu.config(width=10)
 
@@ -120,6 +122,7 @@ class Paint(object):
         Label(text="C").grid(row=6, column=0)
         Entry(self.root, textvariable=self.C, width=10).grid(row=6, column=1)
         Checkbutton(self.root, variable=self.verbose, text="Verbose").grid(row=6, column=2)
+        Checkbutton(self.root, variable=self.testModel, text="TestModel").grid(row=6, column=3)
         
         self.setup()
         self.root.mainloop()
@@ -192,6 +195,8 @@ class Paint(object):
         self.models = os.listdir("./models/")
         if(len(self.models) != 0):
             self.modelName.set(self.models[0])
+        else:
+            self.models = ['None']
 
     def selectModel(self, *args):
         if(self.modelName.get() != "None"):
@@ -199,7 +204,7 @@ class Paint(object):
 
     def train_thread(self):
         classifier = svm.SVC(C=float(self.C.get()), kernel=self.kernel.get(), degree=int(self.degree.get()),
-         gamma=self.gamma.get(), coef0=float(self.coef.get()), shrinking=self.shrinking.get(),
+         gamma=float(self.gamma.get()), coef0=float(self.coef.get()), shrinking=self.shrinking.get(),
           probability=self.probability.get(), tol=float(self.stoppingCriterion.get()),
           cache_size=int(self.chacheSize.get()), max_iter=int(self.maxIter.get()), verbose=self.verbose.get())
         #We learn the digits on train part
@@ -208,6 +213,21 @@ class Paint(object):
         name = self.get_model_name()
         joblib.dump(classifier, "./models/" + name + '.sav')
         print('Saved model' + "./models/" + name + '.sav')
+        
+        if(self.testModel.get()):
+            expected = self.y_test
+            predicted = classifier.predict(self.X_test)
+            show_some_digits(self.X_test,predicted,title_text="Predicted {}")
+            cm = metrics.confusion_matrix(expected, predicted)
+            print("Confusion matrix:\n%s" % cm)
+            plot_confusion_matrix(cm)
+            print("accuracy_score: ",metrics.accuracy_score(expected, predicted, normalize=True, sample_weight=None))
+
+        self.models.append(name)
+        self.modelMenu = OptionMenu(self.root, self.modelName, *(self.models))
+        self.modelMenu.grid(row=0, column=1)
+        self.modelMenu.config(width=10)
+
         self.train.configure(state=NORMAL)
 
 
